@@ -351,7 +351,7 @@ class ServerTab(tk.Frame):
 class PerformanceDashboard(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Multi-Server Performance Monitor")
+        self.title("Server Performance Monitor")
         self.geometry("745x865")
         self.configure(bg="#2E2E2E")
 

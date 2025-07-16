@@ -1,0 +1,10 @@
+[Unit]
+Description=stress-ng load generator
+After=network.target
+
+[Service]
+ExecStart=/bin/bash /opt/monitor/loadgenerator.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

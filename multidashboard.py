@@ -310,7 +310,7 @@ class ServerTab(tk.Frame):
         max_disk_io = max(disk_plot_data) if any(disk_plot_data) else 0
         disk_ylim_top = max(1024, max_disk_io * 1.1)
         ax_disk.set_ylim(bottom=0, top=disk_ylim_top)
-        ax_disk.set_title("Disk I/O (B/s)", fontsize=9)
+        ax_disk.set_title("Disk I/O", fontsize=9)
         ax_disk.yaxis.set_major_formatter(FuncFormatter(self.format_bytes_ax))
 
         # Network I/O Graph
@@ -320,7 +320,7 @@ class ServerTab(tk.Frame):
         max_net_io = max(net_plot_data) if any(net_plot_data) else 0
         net_ylim_top = max(1024, max_net_io * 1.1)
         ax_net.set_ylim(bottom=0, top=net_ylim_top)
-        ax_net.set_title("Network I/O (B/s)", fontsize=9)
+        ax_net.set_title("Network I/O", fontsize=9)
         ax_net.yaxis.set_major_formatter(FuncFormatter(self.format_bytes_ax))
 
         for ax in self.ax_map.values():

@@ -155,21 +155,34 @@ class ServerTab(tk.Frame):
             self.toggle_button.config(text="Start Monitoring")
             self.dashboard.update_status("Monitoring stopped.")
         else:
-            if not self.server_ip.get():
-                    self.dashboard.update_status("Error: Please enter a server IP address.")
-                    return
+            server_ip_val = self.server_ip.get()
+            if not server_ip_val:
+                self.dashboard.update_status("Error: Please enter a server IP address.")
+                return
+
             self.monitoring = True
             self.toggle_button.config(text="Stop Monitoring")
-            self.dashboard.update_status(f"Starting monitoring for {self.server_ip.get()}...")
-            self.monitor_thread = threading.Thread(target=self.monitor_loop, daemon=True)
+            self.dashboard.update_status(f"Starting monitoring for {server_ip_val}...")
+
+            # Use a config dictionary to pass to the thread.
+            # This prevents the thread from accessing Tkinter variables directly, preventing a lockup.
+            config = {
+                "ip": server_ip_val,
+                "interval": self.update_interval.get()
+            }
+            self.monitor_thread = threading.Thread(target=self.monitor_loop, args=(config,), daemon=True)
+
             self.monitor_thread.start()
-            self.flash_alerting_labels() # Start the loop to give a flashing alert
+            self.flash_alerting_labels()  # Start the loop to give a flashing alert
 
     # Loop that executes while monitoring is active, that pulls data from the API as often as set by the user
-    def monitor_loop(self):
+    def monitor_loop(self, config):
+        server_ip = config["ip"]
+        update_interval = config["interval"]
+
         while self.monitoring:
             try:
-                response = requests.get(f"http://{self.server_ip.get()}/metrics", timeout=2.5)
+                response = requests.get(f"http://{server_ip}/metrics", timeout=2.5)
                 response.raise_for_status()
                 data = response.json()
                 # Check again if monitoring was stopped while waiting for the request
@@ -182,11 +195,9 @@ class ServerTab(tk.Frame):
             except Exception as e:
                 if self.monitoring:
                     self.after(0, lambda e=e: self.dashboard.update_status(f"An error occurred: {e}"))
-            try:
-                # Sleep for the user-defined interval
-                time.sleep(self.update_interval.get())
-            except tk.TclError: # Handle case where window is closed during sleep
-                break
+
+            # Sleep for the user-defined interval
+            time.sleep(update_interval)
 
     # Formatting of data units functions
     def format_bytes_ax(self, byte_count, pos=None):

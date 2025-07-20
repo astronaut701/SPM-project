@@ -1,2 +1,2 @@
 @reboot /opt/monitor/checkscript.sh
-/1 * * * * /opt/monitor/checkscript.sh
+5 * * * * /opt/monitor/checkscript.sh

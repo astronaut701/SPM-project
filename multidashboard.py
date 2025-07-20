@@ -13,8 +13,9 @@ import math
 # A single server tab
 class ServerTab(tk.Frame):
 
-    def __init__(self, parent, *args, **kwargs):
+    def __init__(self, parent, dashboard, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
+        self.dashboard = dashboard # Reference the main window to deal with update_status scope being funky
         self.configure(bg="#2E2E2E")
 
         # Styling
@@ -31,6 +32,7 @@ class ServerTab(tk.Frame):
         self.update_interval = tk.IntVar(value=3)
         self.monitoring = False
         self.monitor_thread = None
+        self.flash_job_id = None
 
         # Graph data
         self.max_data_points = 200  # A large buffer to hold data history
@@ -151,17 +153,14 @@ class ServerTab(tk.Frame):
         if self.monitoring:
             self.monitoring = False
             self.toggle_button.config(text="Start Monitoring")
-            if hasattr(self.master.master, 'update_status'):
-                self.master.master.update_status("Monitoring stopped.")
+            self.dashboard.update_status("Monitoring stopped.")
         else:
             if not self.server_ip.get():
-                if hasattr(self.master.master, 'update_status'):
-                    self.master.master.update_status("Error: Please enter a server IP address.")
-                return
+                    self.dashboard.update_status("Error: Please enter a server IP address.")
+                    return
             self.monitoring = True
             self.toggle_button.config(text="Stop Monitoring")
-            if hasattr(self.master.master, 'update_status'):
-                self.master.master.update_status(f"Starting monitoring for {self.server_ip.get()}...")
+            self.dashboard.update_status(f"Starting monitoring for {self.server_ip.get()}...")
             self.monitor_thread = threading.Thread(target=self.monitor_loop, daemon=True)
             self.monitor_thread.start()
             self.flash_alerting_labels() # Start the loop to give a flashing alert
@@ -173,13 +172,16 @@ class ServerTab(tk.Frame):
                 response = requests.get(f"http://{self.server_ip.get()}/metrics", timeout=2.5)
                 response.raise_for_status()
                 data = response.json()
-                self.after(0, self.update_ui, data)
+                # Check again if monitoring was stopped while waiting for the request
+                if self.monitoring:
+                    self.after(0, self.update_ui, data)
             except requests.exceptions.RequestException as e:
-                self.after(0, lambda: self.master.master.update_status(f"Connection Error: {e}"))
-                self.after(10000, self.reset_metrics)
+                if self.monitoring:
+                    self.after(0, lambda e=e: self.dashboard.update_status(f"Connection Error: {e}"))
+                    self.after(10000, self.reset_metrics)
             except Exception as e:
-                self.after(0, lambda: self.master.master.update_status(f"An error occurred: {e}"))
-
+                if self.monitoring:
+                    self.after(0, lambda e=e: self.dashboard.update_status(f"An error occurred: {e}"))
             try:
                 # Sleep for the user-defined interval
                 time.sleep(self.update_interval.get())
@@ -203,7 +205,7 @@ class ServerTab(tk.Frame):
     # Function to prompt an update of the UI as new data is pulled.
     def update_ui(self, data):
         if not self.monitoring: return
-        self.master.master.update_status(f"Connected to {self.server_ip.get()}. Last update: {time.strftime('%H:%M:%S')}")
+        self.dashboard.update_status(f"Connected to {self.server_ip.get()}. Last update: {time.strftime('%H:%M:%S')}")
 
         metrics_to_check = {
             "CPU Usage": (data.get('cpu_percent', 0), self.cpu_threshold.get()),
@@ -256,7 +258,7 @@ class ServerTab(tk.Frame):
                     self.metric_labels[name].config(bg=self.alert_bg)
                     self.flash_state[name] = 'red'
 
-        self.after(500, self.flash_alerting_labels)
+        self.flash_job_id = self.after(500, self.flash_alerting_labels)
 
     def update_graphs(self):
         # Dynanically calculate points for the last 30 seconds
@@ -346,12 +348,15 @@ class ServerTab(tk.Frame):
     # Convenience function to control monitoring status
     def stop_monitoring(self):
         self.monitoring = False
+        if self.flash_job_id:
+            self.after_cancel(self.flash_job_id)
+            self.flash_job_id = None
 
 # Seperate foreground class responsable for the window, server buttons/tabs, updating, and closing the program.
 class PerformanceDashboard(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Server Performance Monitor")
+        self.title("Multi-Server Performance Monitor")
         self.geometry("745x865")
         self.configure(bg="#2E2E2E")
 
@@ -376,7 +381,7 @@ class PerformanceDashboard(tk.Tk):
 
     def add_server_tab(self):
         tab_count = len(self.notebook.tabs()) + 1
-        new_tab = ServerTab(self.notebook)
+        new_tab = ServerTab(self.notebook, dashboard=self)
         self.notebook.add(new_tab, text=f"Server {tab_count}")
         self.tabs.append(new_tab)
         self.notebook.select(new_tab)
@@ -399,6 +404,9 @@ class PerformanceDashboard(tk.Tk):
 
         if messagebox.askyesno("Confirm Removal", question, parent=self):
             selected_tab_widget.stop_monitoring()
+            # Wait for the widget threads to finish.
+            if selected_tab_widget.monitor_thread and selected_tab_widget.monitor_thread.is_alive():
+                selected_tab_widget.monitor_thread.join()
             current_selection_index = self.notebook.index(self.notebook.select())
             self.notebook.forget(selected_tab_widget)
             self.tabs.pop(current_selection_index)
@@ -415,6 +423,9 @@ class PerformanceDashboard(tk.Tk):
     def on_closing(self):
         for tab in self.tabs:
             tab.stop_monitoring()
+            # Wait for monitoring threads to finish
+            if tab.monitor_thread and tab.monitor_thread.is_alive():
+                tab.monitor_thread.join() # Bring them all together to prevent a race condition.
         plt.close()
         self.destroy()
 

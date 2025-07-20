@@ -1,2 +1,2 @@
-@reboot /home/INSERTUSERHERE/checkscript.sh
-/1 * * * * /home/INSERTUSERHERE/checkscript.sh
+@reboot /opt/monitor/checkscript.sh
+/1 * * * * /opt/monitor/checkscript.sh

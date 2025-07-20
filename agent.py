@@ -1,6 +1,5 @@
 from flask import Flask, jsonify
 import json
-import os
 
 # Setup flash server and define pipe
 app = Flask(__name__)

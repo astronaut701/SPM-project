@@ -19,7 +19,7 @@ Data will begin to populate. Once you are done, you can simply hit the "Stop Mon
 
 The server side functions in a few components.
 
-Firstly, it is expected that again, the required packages in the requirements.txt (again, you may just install flask and psutil packages manually), and to create a `monitor` user (and group, if not made along with the `monitor` user), as well as a directory for the user (`/opt/monitor` is the default) to store the agent.py and collector.py scripts, as well as the checkscript.sh bash script.
+Firstly, it is expected that again, the required packages in the requirements.txt are installed on the server (again, you may just install flask and psutil packages manually), and to create a `monitor` user (and group, if not made along with the `monitor` user), as well as a directory for the user (`/opt/monitor` is the default) to store the agent.py and collector.py scripts, as well as the checkscript.sh bash script.
 
 To automate the running of agent.py and collector.py, you may add the contents of crontab.txt to root's crontab. (Use sudo if needed)
 

@@ -405,7 +405,9 @@ class PerformanceDashboard(tk.Tk):
             return
 
         try:
+            # Get the widget and index of the currently selected tab
             selected_tab_widget = self.nametowidget(self.notebook.select())
+            current_selection_index = self.notebook.index(self.notebook.select())
         except tk.TclError:
             self.update_status("No server tab selected to remove.")
             return
@@ -414,15 +416,22 @@ class PerformanceDashboard(tk.Tk):
         question = f"Are you sure you want to remove the tab for {ip_address}?"
 
         if messagebox.askyesno("Confirm Removal", question, parent=self):
+            # Bring the monitoring loop and any scheduled jobs to stop.
             selected_tab_widget.stop_monitoring()
-            # Wait for the widget threads to finish.
-            if selected_tab_widget.monitor_thread and selected_tab_widget.monitor_thread.is_alive():
-                selected_tab_widget.monitor_thread.join()
-            current_selection_index = self.notebook.index(self.notebook.select())
-            self.notebook.forget(selected_tab_widget)
-            self.tabs.pop(current_selection_index)
-            self.update_status(f"Removed tab for {ip_address}.")
-            self.update_tab_titles()
+            self.update_status(f"Stopping monitoring for {ip_address}...")
+
+            # Remove the tab after a short delay with a helper function
+            self.after(100, self._finalize_tab_removal, selected_tab_widget, current_selection_index, ip_address)
+
+    # Helper function to perform the actual removal of everything
+    def _finalize_tab_removal(self, tab_to_remove, tab_index, ip_address):
+        # Forget the tab from the notebook, destroying its widgets
+        self.notebook.forget(tab_to_remove)
+        # Remove the tab object from the list of tabs
+        self.tabs.pop(tab_index)
+
+        self.update_status(f"Removed tab for {ip_address}.")
+        self.update_tab_titles()
 
     def update_tab_titles(self):
         for i, tab in enumerate(self.tabs):
@@ -434,10 +443,7 @@ class PerformanceDashboard(tk.Tk):
     def on_closing(self):
         for tab in self.tabs:
             tab.stop_monitoring()
-            # Wait for monitoring threads to finish
-            if tab.monitor_thread and tab.monitor_thread.is_alive():
-                tab.monitor_thread.join() # Bring them all together to prevent a race condition.
-        plt.close()
+        plt.close('all')
         self.destroy()
 
 if __name__ == "__main__":
